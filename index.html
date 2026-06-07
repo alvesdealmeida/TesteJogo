@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4b400">
+<title>Lápis Léo — Aventura de Escrever</title>
+<style>
+/* ============================================================
+   LÁPIS LÉO — Jogo de traçado para tablet
+   Estética: caderno escolar / papel pautado, lúdico e quente.
+   Tudo offline, single-file, sem dependências externas.
+   ============================================================ */
+
+:root{
+  --papel:#fdf8ec;
+  --papel-linha:#dfe9f3;
+  --margem:#f3a3a3;
+  --tinta:#2b4a6f;       /* azul lápis */
+  --amarelo:#f4b400;     /* lápis */
+  --amarelo-esc:#d99700;
+  --verde:#3fa34d;
+  --verde-esc:#2e7d36;
+  --vermelho:#e15a4f;
+  --roxo:#8e6bd1;
+  --cinza-guia:#cdd5df;
+  --sombra:0 6px 0 rgba(0,0,0,.12);
+  --r:22px;
+  --fonte: 'Comic Sans MS','Chalkboard SE','Comic Neue','Segoe Print','Baloo 2',system-ui,sans-serif;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:var(--fonte);
+  color:var(--tinta);
+  background:
+    repeating-linear-gradient(transparent, transparent 33px, var(--papel-linha) 33px, var(--papel-linha) 34px),
+    var(--papel);
+  background-attachment:fixed;
+  overflow-x:hidden;
+  -webkit-user-select:none; user-select:none;
+  touch-action:manipulation;
+}
+/* margem vermelha do caderno */
+body::before{
+  content:"";position:fixed;left:32px;top:0;bottom:0;width:2px;
+  background:var(--margem);opacity:.5;z-index:0;pointer-events:none;
+}
+.tela{display:none;min-height:100%;flex-direction:column;position:relative;z-index:1;}
+.tela.ativa{display:flex;}
+
+/* ---------- Cabeçalho ---------- */
+header{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 18px 10px 46px;
+}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.logo h1{font-size:clamp(20px,5vw,30px);margin:0;color:var(--amarelo-esc);
+  text-shadow:1px 1px 0 #fff,2px 3px 0 rgba(0,0,0,.08);letter-spacing:.5px;}
+.placar{margin-left:auto;display:flex;align-items:center;gap:8px;
+  background:#fff;border:3px solid var(--amarelo);border-radius:999px;
+  padding:6px 14px;box-shadow:var(--sombra);font-size:16px;font-weight:bold;}
+.placar .xp{color:var(--verde-esc);}
+.gear{width:46px;height:46px;border:none;background:#fff;border:3px solid var(--cinza-guia);
+  border-radius:50%;font-size:22px;cursor:pointer;box-shadow:var(--sombra);
+  display:flex;align-items:center;justify-content:center;}
+.gear:active{transform:translateY(3px);box-shadow:none;}
+
+/* ---------- Mascote ---------- */
+.mascote{width:120px;height:auto;display:block;}
+@keyframes flutua{0%,100%{transform:translateY(0) rotate(-4deg);}50%{transform:translateY(-10px) rotate(4deg);}}
+.flutua{animation:flutua 3s ease-in-out infinite;}
+
+/* ---------- HOME ---------- */
+#home{align-items:center;justify-content:flex-start;text-align:center;padding-bottom:40px;}
+.balao{background:#fff;border:3px solid var(--tinta);border-radius:24px;padding:14px 20px;
+  margin:6px auto 0;max-width:340px;font-size:17px;position:relative;box-shadow:var(--sombra);}
+.balao::after{content:"";position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);
+  border:9px solid transparent;border-top-color:var(--tinta);}
+.balao::before{content:"";position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);
+  border:8px solid transparent;border-top-color:#fff;z-index:1;}
+.btn-grande{font-family:var(--fonte);font-size:24px;font-weight:bold;color:#fff;
+  background:var(--verde);border:none;border-bottom:6px solid var(--verde-esc);
+  border-radius:var(--r);padding:18px 40px;margin-top:24px;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);}
+.btn-grande:active{transform:translateY(4px);border-bottom-width:2px;}
+
+/* ---------- TRILHA / FASES ---------- */
+#trilha{padding:0 18px 40px 46px;}
+.titulo-sec{text-align:center;color:var(--amarelo-esc);margin:6px 0 16px;font-size:22px;}
+.fases{display:flex;flex-direction:column;gap:18px;max-width:520px;margin:0 auto;}
+.fase{display:flex;align-items:center;gap:16px;background:#fff;border:3px solid var(--cinza-guia);
+  border-radius:var(--r);padding:14px 16px;cursor:pointer;box-shadow:var(--sombra);
+  transition:transform .1s;}
+.fase:active{transform:translateY(3px);box-shadow:none;}
+.fase.bloqueada{opacity:.5;filter:grayscale(.6);}
+.fase .ico{font-size:36px;width:54px;height:54px;display:flex;align-items:center;justify-content:center;
+  background:var(--papel);border-radius:14px;border:2px solid var(--cinza-guia);}
+.fase .info{flex:1;text-align:left;}
+.fase .info b{font-size:19px;display:block;}
+.fase .info small{color:#7c8a9a;font-size:13px;}
+.fase .estrelas{font-size:18px;letter-spacing:2px;color:var(--amarelo);}
+.cad{font-size:26px;}
+
+/* ---------- JOGO ---------- */
+#jogo{padding:8px 14px 18px 40px;}
+.barra-topo{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.btn-voltar{font-family:var(--fonte);font-size:16px;background:#fff;border:3px solid var(--cinza-guia);
+  border-radius:14px;padding:8px 14px;cursor:pointer;font-weight:bold;box-shadow:var(--sombra);}
+.btn-voltar:active{transform:translateY(3px);box-shadow:none;}
+.progresso-itens{margin-left:auto;display:flex;gap:6px;}
+.bolinha{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--cinza-guia);}
+.bolinha.feita{background:var(--verde);border-color:var(--verde-esc);}
+.bolinha.atual{border-color:var(--amarelo);background:var(--amarelo);}
+
+.pergunta{text-align:center;font-size:18px;margin:2px 0 8px;color:#6b7a8a;}
+.pergunta b{color:var(--tinta);font-size:22px;}
+
+.area-canvas{position:relative;width:100%;max-width:760px;margin:0 auto;
+  aspect-ratio:16/9;background:#fff;border:4px solid var(--tinta);border-radius:20px;
+  box-shadow:var(--sombra);overflow:hidden;}
+.area-canvas canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+#guideCanvas{z-index:1;}
+#inkCanvas{z-index:2;touch-action:none;cursor:crosshair;}
+/* pauta de apoio dentro da área */
+.linha-base{position:absolute;left:4%;right:4%;height:2px;background:var(--margem);opacity:.35;z-index:0;}
+
+.controles{display:flex;align-items:center;gap:10px;max-width:760px;margin:12px auto 0;flex-wrap:wrap;}
+.medidor{flex:1;min-width:160px;height:26px;background:#fff;border:3px solid var(--cinza-guia);
+  border-radius:999px;overflow:hidden;position:relative;}
+.medidor i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--amarelo),var(--verde));
+  transition:width .12s;}
+.medidor span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:bold;color:var(--tinta);}
+.btn{font-family:var(--fonte);font-weight:bold;font-size:17px;border:none;border-radius:16px;
+  padding:12px 18px;cursor:pointer;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.18);}
+.btn:active{transform:translateY(4px);box-shadow:none;}
+.btn.limpar{background:var(--vermelho);}
+.btn.ouvir{background:var(--roxo);}
+.btn.pronto{background:var(--verde);}
+.btn[disabled]{opacity:.45;cursor:not-allowed;}
+
+/* ---------- Overlay de sucesso ---------- */
+.overlay{position:fixed;inset:0;background:rgba(43,74,111,.55);z-index:50;
+  display:none;align-items:center;justify-content:center;padding:20px;}
+.overlay.ativa{display:flex;}
+.card-sucesso{background:#fff;border:5px solid var(--amarelo);border-radius:28px;
+  padding:26px 24px;text-align:center;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);
+  animation:pop .35s ease;}
+@keyframes pop{0%{transform:scale(.7);opacity:0;}100%{transform:scale(1);opacity:1;}}
+.card-sucesso h2{margin:6px 0;color:var(--verde-esc);font-size:26px;}
+.estrelas-grandes{font-size:46px;letter-spacing:6px;color:var(--amarelo);margin:8px 0;}
+.estrelas-grandes .off{color:#e4e9ef;}
+.card-sucesso p{font-size:17px;margin:6px 0 16px;}
+
+/* ---------- Modal Professor ---------- */
+.modal{position:fixed;inset:0;background:rgba(43,74,111,.55);z-index:60;
+  display:none;align-items:center;justify-content:center;padding:18px;}
+.modal.ativa{display:flex;}
+.card-modal{background:#fff;border:4px solid var(--tinta);border-radius:24px;padding:22px;
+  max-width:420px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+.card-modal h2{margin:0 0 14px;color:var(--tinta);}
+.linha-cfg{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 0;border-bottom:1px dashed var(--cinza-guia);}
+.linha-cfg label{font-weight:bold;font-size:16px;}
+.card-modal input[type=range]{width:130px;}
+.card-modal input[type=text]{font-family:var(--fonte);font-size:16px;padding:10px;border:2px solid var(--cinza-guia);
+  border-radius:12px;width:100%;}
+.card-modal textarea{font-family:var(--fonte);font-size:16px;padding:10px;border:2px solid var(--cinza-guia);
+  border-radius:12px;width:100%;min-height:70px;resize:vertical;}
+.switch{width:54px;height:30px;background:var(--cinza-guia);border-radius:999px;position:relative;cursor:pointer;transition:.2s;}
+.switch.on{background:var(--verde);}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:.2s;}
+.switch.on::after{left:27px;}
+.btn-fechar{margin-top:18px;width:100%;background:var(--tinta);}
+
+/* confete */
+.confete{position:fixed;top:-20px;width:12px;height:18px;z-index:80;pointer-events:none;border-radius:2px;}
+@keyframes cair{to{transform:translateY(110vh) rotate(720deg);opacity:.2;}}
+
+.dica-touch{text-align:center;font-size:13px;color:#9aa7b5;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== TELA HOME ===================== -->
+<section class="tela ativa" id="home">
+  <header>
+    <div class="logo" id="logoHome">
+      <h1>✏️ Lápis Léo</h1>
+    </div>
+    <div class="placar">⭐ <span class="xp" id="xpHome">0</span> XP</div>
+    <button class="gear" id="gearHome" title="Professor">⚙️</button>
+  </header>
+
+  <div style="margin-top:10px;">
+    <!-- Mascote: lápis simpático -->
+    <svg class="mascote flutua" viewBox="0 0 120 200" aria-label="Lápis Léo">
+      <rect x="40" y="40" width="40" height="120" rx="6" fill="#f4b400" stroke="#d99700" stroke-width="3"/>
+      <rect x="40" y="40" width="40" height="14" fill="#e8e2d0" stroke="#d99700" stroke-width="3"/>
+      <rect x="38" y="28" width="44" height="16" rx="6" fill="#f7a1a1" stroke="#d97f7f" stroke-width="3"/>
+      <polygon points="40,160 80,160 60,196" fill="#f0d9b5" stroke="#caa873" stroke-width="3"/>
+      <polygon points="52,178 68,178 60,196" fill="#3a3a3a"/>
+      <circle cx="52" cy="95" r="6" fill="#2b4a6f"/>
+      <circle cx="68" cy="95" r="6" fill="#2b4a6f"/>
+      <circle cx="54" cy="93" r="2" fill="#fff"/>
+      <circle cx="70" cy="93" r="2" fill="#fff"/>
+      <path d="M50 110 Q60 120 70 110" fill="none" stroke="#2b4a6f" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="46" cy="106" r="4" fill="#f7a1a1" opacity=".6"/>
+      <circle cx="74" cy="106" r="4" fill="#f7a1a1" opacity=".6"/>
+    </svg>
+  </div>
+
+  <div class="balao" id="balaoHome">Oi! Eu sou o Léo. Bora <b>escrever brincando</b>? É só passar o dedo por cima das letras! 🖍️</div>
+
+  <button class="btn-grande" id="btnComecar">▶ Começar!</button>
+</section>
+
+<!-- ===================== TELA TRILHA ===================== -->
+<section class="tela" id="trilha">
+  <header>
+    <div class="logo" id="logoTrilha"><h1>✏️ Trilha</h1></div>
+    <div class="placar">⭐ <span class="xp" id="xpTrilha">0</span> XP</div>
+    <button class="gear" id="gearTrilha" title="Professor">⚙️</button>
+  </header>
+  <div class="titulo-sec">Escolha uma aventura 👇</div>
+  <div class="fases" id="listaFases"></div>
+</section>
+
+<!-- ===================== TELA JOGO ===================== -->
+<section class="tela" id="jogo">
+  <div class="barra-topo">
+    <button class="btn-voltar" id="btnVoltar">← Voltar</button>
+    <div class="progresso-itens" id="progItens"></div>
+  </div>
+
+  <div class="pergunta">Trace: <b id="alvoTexto">A</b></div>
+
+  <div class="area-canvas" id="areaCanvas">
+    <div class="linha-base" style="bottom:22%"></div>
+    <canvas id="guideCanvas"></canvas>
+    <canvas id="inkCanvas"></canvas>
+  </div>
+
+  <div class="controles">
+    <div class="medidor"><i id="medFill"></i><span id="medTxt">0%</span></div>
+    <button class="btn ouvir" id="btnOuvir">🔊 Ouvir</button>
+    <button class="btn limpar" id="btnLimpar">🧽 Apagar</button>
+    <button class="btn pronto" id="btnPronto" disabled>✅ Pronto!</button>
+  </div>
+  <div class="dica-touch">Use o dedo ou a caneta para cobrir o desenho pontilhado.</div>
+</section>
+
+<!-- ===================== OVERLAY SUCESSO ===================== -->
+<div class="overlay" id="overlaySucesso">
+  <div class="card-sucesso">
+    <div style="font-size:40px">🎉</div>
+    <h2 id="tituloSucesso">Muito bem!</h2>
+    <div class="estrelas-grandes" id="estrelasSucesso">⭐⭐⭐</div>
+    <p id="textoSucesso">Você ganhou 10 XP!</p>
+    <button class="btn pronto" id="btnContinuar" style="width:100%">Continuar ▶</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL PROFESSOR ===================== -->
+<div class="modal" id="modalProf">
+  <div class="card-modal">
+    <h2>⚙️ Painel do Professor</h2>
+
+    <div class="linha-cfg">
+      <label>Espessura do lápis</label>
+      <input type="range" id="cfgBrush" min="6" max="26" step="2" value="12">
+    </div>
+    <div class="linha-cfg">
+      <label>Mostrar guia pontilhado</label>
+      <div class="switch on" id="cfgGuia"></div>
+    </div>
+    <div class="linha-cfg">
+      <label>Facilidade (meta de cobertura)</label>
+      <input type="range" id="cfgMeta" min="55" max="90" step="5" value="72">
+    </div>
+
+    <div style="margin:14px 0 6px;font-weight:bold;">📝 Minhas palavras (uma por linha)</div>
+    <textarea id="cfgPalavras" placeholder="Ex.:&#10;JOÃO&#10;MAMÃE&#10;ESCOLA"></textarea>
+    <small style="color:#7c8a9a">Aparecem na fase "Minhas Palavras". Ótimo para usar o nome do aluno!</small>
+
+    <div class="linha-cfg" style="margin-top:14px">
+      <label>Apagar todo o progresso</label>
+      <button class="btn limpar" id="cfgReset" style="font-size:14px;padding:8px 12px">Zerar</button>
+    </div>
+
+    <button class="btn btn-fechar" id="btnFecharProf">Salvar e fechar</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   ESTADO E PERSISTÊNCIA
+   localStorage com fallback em memória (funciona no preview e no deploy)
+   ===================================================================== */
+const MEM = {};
+const store = {
+  get(k,def){ try{ const v=localStorage.getItem(k); return v===null?def:JSON.parse(v);}catch(e){ return k in MEM?MEM[k]:def; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ MEM[k]=v; } }
+};
+
+let estado = store.get('leo_estado', {
+  xp:0,
+  estrelas:{},        // {faseId: {itemIndex: estrelas}}
+  desbloqueado:1      // até qual fase liberada
+});
+
+let cfg = store.get('leo_cfg', { brush:12, guia:true, meta:72, palavras:['MEU NOME','MAMÃE','ESCOLA'] });
+
+function salvar(){ store.set('leo_estado', estado); store.set('leo_cfg', cfg); }
+
+/* =====================================================================
+   FASES
+   ===================================================================== */
+const FASES = [
+  { id:1, nome:'Vogais',        ico:'🅰️', itens:['A','E','I','O','U'] },
+  { id:2, nome:'Sílabas',       ico:'🧩', itens:['BA','BE','CA','MA','PA','LO'] },
+  { id:3, nome:'Palavras Curtas',ico:'🐱', itens:['SOL','LUA','BOLA','GATO','CASA','PATO'] },
+  { id:4, nome:'Palavras',      ico:'🏫', itens:['ESCOLA','AMIGO','FELIZ','BRASIL'] },
+  { id:5, nome:'Frases',        ico:'💬', itens:['EU LEIO','EU GOSTO','VOU TENTAR'] },
+  { id:6, nome:'Minhas Palavras',ico:'⭐', itens:[] } // preenchida do painel professor
+];
+function itensDaFase(f){ return f.id===6 ? (cfg.palavras.length?cfg.palavras:['MEU NOME']) : f.itens; }
+
+/* =====================================================================
+   ÁUDIO (Web Audio API)
+   ===================================================================== */
+let AC=null;
+function audio(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return AC; }
+function bip(freq, dur=0.12, tipo='sine', vol=0.25){
+  const a=audio(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=tipo; o.frequency.value=freq;
+  o.connect(g); g.connect(a.destination);
+  g.gain.setValueAtTime(vol,a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+dur);
+  o.start(); o.stop(a.currentTime+dur);
+}
+function somSucesso(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>bip(f,0.18,'triangle',0.3),i*110)); }
+function somToque(){ bip(420,0.05,'sine',0.12); }
+
+/* falar a letra/palavra (offline na maioria dos dispositivos) */
+function falar(txt){
+  try{
+    if(!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(txt);
+    u.lang='pt-BR'; u.rate=0.85; u.pitch=1.1;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* =====================================================================
+   NAVEGAÇÃO DE TELAS
+   ===================================================================== */
+function mostrar(id){ document.querySelectorAll('.tela').forEach(t=>t.classList.remove('ativa')); document.getElementById(id).classList.add('ativa'); }
+function atualizaXP(){ document.querySelectorAll('.xp').forEach(e=>e.textContent=estado.xp); }
+
+/* =====================================================================
+   RENDER DA TRILHA
+   ===================================================================== */
+function renderTrilha(){
+  const cont=document.getElementById('listaFases'); cont.innerHTML='';
+  FASES.forEach(f=>{
+    const liberada = f.id<=estado.desbloqueado;
+    const itens = itensDaFase(f);
+    const div=document.createElement('div');
+    div.className='fase'+(liberada?'':' bloqueada');
+    // estrelas acumuladas na fase
+    const est=estado.estrelas[f.id]||{};
+    const total=Object.values(est).reduce((a,b)=>a+b,0);
+    const max=itens.length*3;
+    div.innerHTML=`
+      <div class="ico">${f.ico}</div>
+      <div class="info"><b>${f.nome}</b><small>${itens.length} desafios • ${total}/${max} estrelas</small></div>
+      <div class="estrelas">${liberada?('⭐'.repeat(Math.min(3,Math.round(total/Math.max(1,itens.length))))||'•'):'<span class="cad">🔒</span>'}</div>`;
+    if(liberada) div.onclick=()=>iniciarFase(f.id);
+    cont.appendChild(div);
+  });
+  atualizaXP();
+}
+
+/* =====================================================================
+   MOTOR DO JOGO (canvas, traçado, cobertura)
+   ===================================================================== */
+const areaCanvas=document.getElementById('areaCanvas');
+const guideCanvas=document.getElementById('guideCanvas');
+const inkCanvas=document.getElementById('inkCanvas');
+const gctx=guideCanvas.getContext('2d');
+const ictx=inkCanvas.getContext('2d');
+const off=document.createElement('canvas');         // offscreen p/ calcular alvos
+const octx=off.getContext('2d', {willReadFrequently:true});
+
+let faseAtual=null, itemIndex=0, itensAtuais=[];
+let cssW=0, cssH=0, dpr=1;
+let targets=[], grid={}, cellSize=22, hitCount=0;
+let desenhando=false, ultimo=null;
+let fonteAlvo=120;
+const RADIUS_BASE=20;   // tolerância de cobertura
+
+function ajustaCanvas(){
+  const rect=areaCanvas.getBoundingClientRect();
+  cssW=rect.width; cssH=rect.height;
+  dpr=Math.min(window.devicePixelRatio||1, 2.5);
+  [guideCanvas,inkCanvas].forEach(c=>{
+    c.width=Math.round(cssW*dpr); c.height=Math.round(cssH*dpr);
+  });
+  gctx.setTransform(dpr,0,0,dpr,0,0);
+  ictx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+/* calcula o maior tamanho de fonte que cabe na área */
+function calculaFonte(texto){
+  let size=Math.min(cssH*0.62, 220);
+  octx.textAlign='center'; octx.textBaseline='middle';
+  while(size>24){
+    octx.font=`900 ${size}px Arial`;
+    if(octx.measureText(texto).width <= cssW*0.86) break;
+    size-=4;
+  }
+  return size;
+}
+
+function desenhaGuia(texto){
+  gctx.clearRect(0,0,cssW,cssH);
+  if(!cfg.guia) return;
+  gctx.save();
+  gctx.textAlign='center'; gctx.textBaseline='middle';
+  gctx.font=`900 ${fonteAlvo}px Arial`;
+  // preenchimento bem clarinho
+  gctx.fillStyle='#eef2f6';
+  gctx.fillText(texto, cssW/2, cssH/2);
+  // contorno tracejado (efeito "para cobrir")
+  gctx.setLineDash([6,8]);
+  gctx.lineWidth=2.5;
+  gctx.strokeStyle='#b9c3cf';
+  gctx.strokeText(texto, cssW/2, cssH/2);
+  gctx.restore();
+}
+
+function montaAlvos(texto){
+  off.width=Math.round(cssW); off.height=Math.round(cssH);
+  octx.clearRect(0,0,off.width,off.height);
+  octx.textAlign='center'; octx.textBaseline='middle';
+  octx.font=`900 ${fonteAlvo}px Arial`;
+  octx.fillStyle='#000';
+  octx.fillText(texto, off.width/2, off.height/2);
+  const img=octx.getImageData(0,0,off.width,off.height).data;
+  targets=[]; grid={}; hitCount=0;
+  const step=5;
+  for(let y=0;y<off.height;y+=step){
+    for(let x=0;x<off.width;x+=step){
+      if(img[(y*off.width+x)*4+3]>110){
+        const idx=targets.length;
+        targets.push({x,y,hit:false});
+        const k=Math.floor(x/cellSize)+'_'+Math.floor(y/cellSize);
+        (grid[k]||(grid[k]=[])).push(idx);
+      }
+    }
+  }
+}
+
+function marcaPerto(px,py){
+  const r=Math.max(cfg.brush, RADIUS_BASE);
+  const r2=r*r;
+  const cx=Math.floor(px/cellSize), cy=Math.floor(py/cellSize);
+  for(let gx=cx-1;gx<=cx+1;gx++){
+    for(let gy=cy-1;gy<=cy+1;gy++){
+      const arr=grid[gx+'_'+gy]; if(!arr) continue;
+      for(const i of arr){
+        const t=targets[i];
+        if(!t.hit){ const dx=t.x-px, dy=t.y-py; if(dx*dx+dy*dy<=r2){ t.hit=true; hitCount++; } }
+      }
+    }
+  }
+}
+
+function cobertura(){ return targets.length? hitCount/targets.length : 0; }
+
+function atualizaMedidor(){
+  const pct=Math.round(cobertura()*100);
+  document.getElementById('medFill').style.width=pct+'%';
+  document.getElementById('medTxt').textContent=pct+'%';
+  const meta=cfg.meta;
+  document.getElementById('btnPronto').disabled = pct < meta;
+}
+
+/* ---- desenho de tinta ---- */
+function pontoEvento(e){
+  const rect=inkCanvas.getBoundingClientRect();
+  return { x:(e.clientX-rect.left), y:(e.clientY-rect.top) };
+}
+function comecaTraco(p){
+  desenhando=true; ultimo=p;
+  ictx.lineCap='round'; ictx.lineJoin='round';
+  ictx.strokeStyle='#2b4a6f'; ictx.lineWidth=cfg.brush;
+  ictx.shadowColor='rgba(43,74,111,.25)'; ictx.shadowBlur=2;
+  ictx.beginPath(); ictx.moveTo(p.x,p.y); ictx.lineTo(p.x+0.1,p.y+0.1); ictx.stroke();
+  marcaPerto(p.x,p.y);
+}
+function moveTraco(p){
+  if(!desenhando) return;
+  ictx.beginPath(); ictx.moveTo(ultimo.x,ultimo.y); ictx.lineTo(p.x,p.y); ictx.stroke();
+  // interpola para registrar cobertura em traços rápidos
+  const dx=p.x-ultimo.x, dy=p.y-ultimo.y;
+  const dist=Math.hypot(dx,dy);
+  const passos=Math.max(1, Math.floor(dist/6));
+  for(let i=0;i<=passos;i++){ marcaPerto(ultimo.x+dx*i/passos, ultimo.y+dy*i/passos); }
+  ultimo=p;
+  atualizaMedidor();
+}
+function fimTraco(){ desenhando=false; atualizaMedidor(); }
+
+/* Pointer Events: unifica mouse + toque + caneta, sem problema de passive listener */
+inkCanvas.addEventListener('pointerdown', e=>{ e.preventDefault(); audio(); somToque(); inkCanvas.setPointerCapture(e.pointerId); comecaTraco(pontoEvento(e)); });
+inkCanvas.addEventListener('pointermove', e=>{ e.preventDefault(); if(desenhando) moveTraco(pontoEvento(e)); });
+inkCanvas.addEventListener('pointerup', e=>{ e.preventDefault(); fimTraco(); });
+inkCanvas.addEventListener('pointercancel', e=>{ fimTraco(); });
+inkCanvas.addEventListener('pointerleave', e=>{ if(desenhando) fimTraco(); });
+
+/* ---- limpar ---- */
+function limparTinta(){
+  ictx.clearRect(0,0,cssW,cssH);
+  targets.forEach(t=>t.hit=false); hitCount=0;
+  atualizaMedidor();
+}
+
+/* =====================================================================
+   FLUXO DA FASE / ITENS
+   ===================================================================== */
+function iniciarFase(id){
+  faseAtual=FASES.find(f=>f.id===id);
+  itensAtuais=itensDaFase(faseAtual);
+  itemIndex=0;
+  mostrar('jogo');
+  // garante layout pronto antes de medir o canvas
+  requestAnimationFrame(()=>{ ajustaCanvas(); carregaItem(); });
+}
+
+function renderProgresso(){
+  const c=document.getElementById('progItens'); c.innerHTML='';
+  itensAtuais.forEach((_,i)=>{
+    const b=document.createElement('div');
+    b.className='bolinha'+(i<itemIndex?' feita':(i===itemIndex?' atual':''));
+    c.appendChild(b);
+  });
+}
+
+function carregaItem(){
+  const texto=itensAtuais[itemIndex];
+  document.getElementById('alvoTexto').textContent=texto;
+  ajustaCanvas();
+  fonteAlvo=calculaFonte(texto);
+  desenhaGuia(texto);
+  montaAlvos(texto);
+  limparTinta();
+  renderProgresso();
+  setTimeout(()=>falar(texto), 300);
+}
+
+function concluirItem(){
+  const pct=Math.round(cobertura()*100);
+  let estrelas = pct>=92?3 : pct>=80?2 : 1;
+  // registra estrelas (mantém a melhor)
+  estado.estrelas[faseAtual.id]=estado.estrelas[faseAtual.id]||{};
+  const ant=estado.estrelas[faseAtual.id][itemIndex]||0;
+  if(estrelas>ant){ estado.estrelas[faseAtual.id][itemIndex]=estrelas; }
+  const ganho=10+estrelas*5;
+  estado.xp+=ganho;
+  salvar(); atualizaXP();
+  somSucesso(); confete();
+  // overlay
+  document.getElementById('estrelasSucesso').innerHTML =
+    '⭐'.repeat(estrelas)+'<span class="off">'+'★'.repeat(3-estrelas)+'</span>';
+  const elogios=['Você é demais!','Que letra linda!','Mandou bem!','Continue assim!','Você consegue!'];
+  document.getElementById('tituloSucesso').textContent=elogios[Math.floor(Math.random()*elogios.length)];
+  document.getElementById('textoSucesso').textContent=`+${ganho} XP conquistados!`;
+  document.getElementById('overlaySucesso').classList.add('ativa');
+}
+
+function proximoItem(){
+  document.getElementById('overlaySucesso').classList.remove('ativa');
+  itemIndex++;
+  if(itemIndex>=itensAtuais.length){
+    // fase concluída -> desbloqueia a próxima
+    if(faseAtual.id===estado.desbloqueado && estado.desbloqueado<FASES.length){
+      estado.desbloqueado=faseAtual.id+1; salvar();
+    }
+    mostrar('trilha'); renderTrilha();
+  } else {
+    carregaItem();
+  }
+}
+
+/* =====================================================================
+   CONFETE
+   ===================================================================== */
+function confete(){
+  const cores=['#f4b400','#3fa34d','#e15a4f','#8e6bd1','#2b4a6f'];
+  for(let i=0;i<28;i++){
+    const c=document.createElement('div');
+    c.className='confete';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=cores[i%cores.length];
+    c.style.animation=`cair ${1.2+Math.random()*1.2}s ease-in forwards`;
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),2600);
+  }
+}
+
+/* =====================================================================
+   PAINEL PROFESSOR
+   ===================================================================== */
+const modal=document.getElementById('modalProf');
+function abreProf(){
+  document.getElementById('cfgBrush').value=cfg.brush;
+  document.getElementById('cfgMeta').value=cfg.meta;
+  document.getElementById('cfgGuia').classList.toggle('on',cfg.guia);
+  document.getElementById('cfgPalavras').value=cfg.palavras.join('\n');
+  modal.classList.add('ativa');
+}
+function fechaProf(){
+  cfg.brush=+document.getElementById('cfgBrush').value;
+  cfg.meta=+document.getElementById('cfgMeta').value;
+  cfg.guia=document.getElementById('cfgGuia').classList.contains('on');
+  cfg.palavras=document.getElementById('cfgPalavras').value
+    .split('\n').map(s=>s.trim().toUpperCase()).filter(Boolean);
+  salvar();
+  modal.classList.remove('ativa');
+  renderTrilha();
+}
+document.getElementById('cfgGuia').onclick=function(){ this.classList.toggle('on'); };
+document.getElementById('cfgReset').onclick=function(){
+  estado={ xp:0, estrelas:{}, desbloqueado:1 }; salvar(); atualizaXP(); renderTrilha();
+  this.textContent='✓ Zerado'; setTimeout(()=>this.textContent='Zerar',1200);
+};
+document.getElementById('btnFecharProf').onclick=fechaProf;
+
+/* =====================================================================
+   LIGAÇÕES DE BOTÕES
+   ===================================================================== */
+document.getElementById('btnComecar').onclick=()=>{ audio(); mostrar('trilha'); renderTrilha(); };
+document.getElementById('btnVoltar').onclick=()=>{ speechSynthesis&&speechSynthesis.cancel(); mostrar('trilha'); renderTrilha(); };
+document.getElementById('btnLimpar').onclick=()=>{ somToque(); limparTinta(); };
+document.getElementById('btnOuvir').onclick=()=> falar(itensAtuais[itemIndex]);
+document.getElementById('btnPronto').onclick=concluirItem;
+document.getElementById('btnContinuar').onclick=proximoItem;
+document.getElementById('gearHome').onclick=abreProf;
+document.getElementById('gearTrilha').onclick=abreProf;
+
+window.addEventListener('resize', ()=>{ if(document.getElementById('jogo').classList.contains('ativa')) carregaItem(); });
+window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ if(document.getElementById('jogo').classList.contains('ativa')) carregaItem(); },300); });
+
+/* iniciar */
+atualizaXP();
+</script>
+</body>
+</html>
